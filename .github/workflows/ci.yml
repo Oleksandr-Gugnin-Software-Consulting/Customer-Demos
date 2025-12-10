@@ -540,3 +540,31 @@ jobs:
         else
           echo "::notice::Image size (${IMAGE_SIZE_MB}MB) is within 200MB target"
         fi
+
+  self_hosted_demo:
+    name: Self-hosted runner demo
+    # This job intentionally runs on any available self-hosted runner to demonstrate
+    # that self-hosted runners accept jobs. It is unconditional (runs on every push).
+    runs-on: [self-hosted]
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Show runner environment (demo)
+      run: |
+        echo "--- Runner / Environment Demo ---"
+        echo "GITHUB_RUN_ID=$GITHUB_RUN_ID"
+        echo "GITHUB_RUN_NUMBER=$GITHUB_RUN_NUMBER"
+        echo "RUNNER_NAME=$RUNNER_NAME"
+        echo "RUNNER_OS=$RUNNER_OS"
+        echo "RUNNER_TOOL_CACHE=$RUNNER_TOOL_CACHE"
+        echo "--- uname ---"
+        uname -a || true
+        echo "--- env (partial) ---"
+        env | sort | sed -n '1,200p'
+        echo "--- docker status (if available) ---"
+        docker --version || true
+        docker ps -a || true
