@@ -1,5 +1,7 @@
 """Minimal FastAPI app with a /health endpoint used by Docker test."""
 
+# test change to trigger CI jobs (no-op comment)
+
 from fastapi import FastAPI
 
 app = FastAPI()

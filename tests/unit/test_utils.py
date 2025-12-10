@@ -7,3 +7,6 @@ def test_add_basic() -> None:
 
 def test_echo_returns_value() -> None:
     assert echo({"a": 1}) == {"a": 1}
+
+
+# ci-trigger: no-op change to cause CI to run all jobs
