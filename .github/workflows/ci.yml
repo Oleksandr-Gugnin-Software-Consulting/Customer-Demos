@@ -35,17 +35,24 @@ jobs:
       - name: Check for file changes
         id: filter
         run: |
-          # Get base branch for comparison
+          # Determine base ref for comparison
+          # - For pull requests use the base commit SHA
+          # - For pushes use the previous commit SHA from the webhook (`github.event.before`)
+          #   which points to the commit before the push. Fall back to `origin/main` if unavailable.
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             BASE_REF="${{ github.event.pull_request.base.sha }}"
           else
-            BASE_REF="origin/main"
+            BASE_REF="${{ github.event.before }}"
+            if [ -z "$BASE_REF" ] || [ "$BASE_REF" = "0000000000000000000000000000000000000000" ]; then
+              BASE_REF="origin/main"
+            fi
           fi
 
           echo "Comparing against: $BASE_REF"
 
-          # Fetch base ref to ensure we have it
-          git fetch origin main:refs/remotes/origin/main || true
+          # Fetch the base ref so that `git diff` can compare against it.
+          # Try fetching the specific base SHA first, otherwise fetch all refs.
+          git fetch origin "$BASE_REF":refs/remotes/origin/base || git fetch --all --prune || true
 
           # Get changed files
           CHANGED_FILES=$(git diff --name-only $BASE_REF...HEAD 2>/dev/null || git diff --name-only HEAD~1...HEAD)
