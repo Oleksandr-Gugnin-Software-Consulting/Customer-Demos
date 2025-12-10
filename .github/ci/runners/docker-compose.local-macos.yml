@@ -1,0 +1,291 @@
+version: '3.8'
+
+# Isolated networks for each runner
+networks:
+  local-runner-1-net:
+    driver: bridge
+  local-runner-2-net:
+    driver: bridge
+  local-runner-3-net:
+    driver: bridge
+  local-runner-4-net:
+    driver: bridge
+
+services:
+  # ===== RUNNER 1 STACK =====
+  local-postgres-1:
+    image: postgres:15-alpine
+    container_name: local-runner-postgres-1
+    environment:
+      POSTGRES_DB: realestate_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_pass
+    volumes:
+      - local_postgres_data_1:/var/lib/postgresql/data
+    networks:
+      local-runner-1-net:
+        aliases:
+          - postgres
+          - localhost
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d realestate_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  local-redis-1:
+    image: redis:7-alpine
+    container_name: local-runner-redis-1
+    volumes:
+      - local_redis_data_1:/data
+    networks:
+      local-runner-1-net:
+        aliases:
+          - redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  local-runner-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.runner
+    image: github-runner-macos:latest
+    container_name: local-macos-runner-1
+    environment:
+      REPO_URL: https://github.com/Oleksandr-Gugnin-Software-Consulting/Customer-Demos
+      RUNNER_NAME: local-macos-runner-1
+      RUNNER_TOKEN: ${RUNNER_TOKEN_1}
+      RUNNER_WORKDIR: /tmp/runner/work
+      LABELS: self-hosted,macOS,ARM64,local
+      DATABASE_URL: postgresql://test_user:test_pass@local-postgres-1:5432/realestate_test
+      REDIS_URL: redis://local-redis-1:6379/0
+      ENVIRONMENT: test
+      CI: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - local_runner_data_1:/tmp/runner
+    networks:
+      - local-runner-1-net
+    depends_on:
+      local-postgres-1:
+        condition: service_healthy
+      local-redis-1:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ===== RUNNER 2 STACK =====
+  local-postgres-2:
+    image: postgres:15-alpine
+    container_name: local-runner-postgres-2
+    environment:
+      POSTGRES_DB: realestate_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_pass
+    volumes:
+      - local_postgres_data_2:/var/lib/postgresql/data
+    networks:
+      local-runner-2-net:
+        aliases:
+          - postgres
+          - localhost
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d realestate_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  local-redis-2:
+    image: redis:7-alpine
+    container_name: local-runner-redis-2
+    volumes:
+      - local_redis_data_2:/data
+    networks:
+      local-runner-2-net:
+        aliases:
+          - redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  local-runner-2:
+    build:
+      context: .
+      dockerfile: Dockerfile.runner
+    image: github-runner-macos:latest
+    container_name: local-macos-runner-2
+    environment:
+      REPO_URL: https://github.com/Oleksandr-Gugnin-Software-Consulting/Customer-Demos
+      RUNNER_NAME: local-macos-runner-2
+      RUNNER_TOKEN: ${RUNNER_TOKEN_2}
+      RUNNER_WORKDIR: /tmp/runner/work
+      LABELS: self-hosted,macOS,ARM64,local
+      DATABASE_URL: postgresql://test_user:test_pass@local-postgres-2:5432/realestate_test
+      REDIS_URL: redis://local-redis-2:6379/0
+      ENVIRONMENT: test
+      CI: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - local_runner_data_2:/tmp/runner
+    networks:
+      - local-runner-2-net
+    depends_on:
+      local-postgres-2:
+        condition: service_healthy
+      local-redis-2:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ===== RUNNER 3 STACK =====
+  local-postgres-3:
+    image: postgres:15-alpine
+    container_name: local-runner-postgres-3
+    environment:
+      POSTGRES_DB: realestate_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_pass
+    volumes:
+      - local_postgres_data_3:/var/lib/postgresql/data
+    networks:
+      local-runner-3-net:
+        aliases:
+          - postgres
+          - localhost
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d realestate_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  local-redis-3:
+    image: redis:7-alpine
+    container_name: local-runner-redis-3
+    volumes:
+      - local_redis_data_3:/data
+    networks:
+      local-runner-3-net:
+        aliases:
+          - redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  local-runner-3:
+    build:
+      context: .
+      dockerfile: Dockerfile.runner
+    image: github-runner-macos:latest
+    container_name: local-macos-runner-3
+    environment:
+      REPO_URL: https://github.com/Oleksandr-Gugnin-Software-Consulting/Customer-Demos
+      RUNNER_NAME: local-macos-runner-3
+      RUNNER_TOKEN: ${RUNNER_TOKEN_3}
+      RUNNER_WORKDIR: /tmp/runner/work
+      LABELS: self-hosted,macOS,ARM64,local
+      DATABASE_URL: postgresql://test_user:test_pass@local-postgres-3:5432/realestate_test
+      REDIS_URL: redis://local-redis-3:6379/0
+      ENVIRONMENT: test
+      CI: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - local_runner_data_3:/tmp/runner
+    networks:
+      - local-runner-3-net
+    depends_on:
+      local-postgres-3:
+        condition: service_healthy
+      local-redis-3:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ===== RUNNER 4 STACK =====
+  local-postgres-4:
+    image: postgres:15-alpine
+    container_name: local-runner-postgres-4
+    environment:
+      POSTGRES_DB: realestate_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_pass
+    volumes:
+      - local_postgres_data_4:/var/lib/postgresql/data
+    networks:
+      local-runner-4-net:
+        aliases:
+          - postgres
+          - localhost
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d realestate_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  local-redis-4:
+    image: redis:7-alpine
+    container_name: local-runner-redis-4
+    volumes:
+      - local_redis_data_4:/data
+    networks:
+      local-runner-4-net:
+        aliases:
+          - redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  local-runner-4:
+    build:
+      context: .
+      dockerfile: Dockerfile.runner
+    image: github-runner-macos:latest
+    container_name: local-macos-runner-4
+    environment:
+      REPO_URL: https://github.com/Oleksandr-Gugnin-Software-Consulting/Customer-Demos
+      RUNNER_NAME: local-macos-runner-4
+      RUNNER_TOKEN: ${RUNNER_TOKEN_4}
+      RUNNER_WORKDIR: /tmp/runner/work
+      LABELS: self-hosted,macOS,ARM64,local
+      DATABASE_URL: postgresql://test_user:test_pass@local-postgres-4:5432/realestate_test
+      REDIS_URL: redis://local-redis-4:6379/0
+      ENVIRONMENT: test
+      CI: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - local_runner_data_4:/tmp/runner
+    networks:
+      - local-runner-4-net
+    depends_on:
+      local-postgres-4:
+        condition: service_healthy
+      local-redis-4:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  local_postgres_data_1:
+  local_postgres_data_2:
+  local_postgres_data_3:
+  local_postgres_data_4:
+  local_redis_data_1:
+  local_redis_data_2:
+  local_redis_data_3:
+  local_redis_data_4:
+  local_runner_data_1:
+  local_runner_data_2:
+  local_runner_data_3:
+  local_runner_data_4:

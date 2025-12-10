@@ -1,0 +1,70 @@
+FROM ubuntu:22.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install required dependencies including Python 3.13 from deadsnakes PPA
+RUN apt-get update && apt-get install -y \
+    curl \
+    jq \
+    git \
+    sudo \
+    ca-certificates \
+    gnupg \
+    lsb-release \
+    software-properties-common \
+    build-essential \
+    libpq-dev \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update \
+    && apt-get install -y \
+    python3.13 \
+    python3.13-venv \
+    python3.13-dev \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Docker CLI
+RUN install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
+    chmod a+r /etc/apt/keyrings/docker.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+    apt-get update && \
+    apt-get install -y docker-ce-cli && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create docker group with GID 991 (matches host docker group on macOS Colima)
+# This allows runner to access docker.sock mounted from host
+RUN groupadd -g 991 docker || true
+
+# Create runner user and add to docker group
+RUN useradd -m -s /bin/bash runner && \
+    usermod -aG sudo runner && \
+    usermod -aG docker runner && \
+    echo "runner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Create GitHub Actions work directory with proper permissions
+RUN mkdir -p /tmp/runner/work && \
+    chown -R runner:runner /tmp/runner && \
+    chmod -R 755 /tmp/runner
+
+# Set working directory
+WORKDIR /home/runner
+
+# Download and install GitHub Actions Runner for ARM64
+ARG RUNNER_VERSION="2.321.0"
+RUN curl -o actions-runner-linux-arm64-${RUNNER_VERSION}.tar.gz -L \
+    https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-arm64-${RUNNER_VERSION}.tar.gz && \
+    tar xzf actions-runner-linux-arm64-${RUNNER_VERSION}.tar.gz && \
+    rm actions-runner-linux-arm64-${RUNNER_VERSION}.tar.gz && \
+    ./bin/installdependencies.sh && \
+    chown -R runner:runner /home/runner
+
+# Switch to runner user
+USER runner
+
+# Create entrypoint script
+COPY --chown=runner:runner entrypoint.sh /home/runner/entrypoint.sh
+RUN chmod +x /home/runner/entrypoint.sh
+
+ENTRYPOINT ["/home/runner/entrypoint.sh"]

@@ -1,0 +1,210 @@
+```dockercompose
+version: '3.8'
+
+networks:
+  runner-network:
+    driver: bridge
+
+services:
+  # PostgreSQL instances (one per runner)
+  postgres-4:
+    image: postgres:15-alpine
+    container_name: runner-postgres-4
+    environment:
+      POSTGRES_DB: realestate_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_4:/var/lib/postgresql/data
+    networks:
+      runner-network:
+        aliases:
+          - postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d realestate_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  postgres-5:
+    image: postgres:15-alpine
+    container_name: runner-postgres-5
+    environment:
+      POSTGRES_DB: realestate_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data_5:/var/lib/postgresql/data
+    networks:
+      - runner-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d realestate_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  postgres-6:
+    image: postgres:15-alpine
+    container_name: runner-postgres-6
+    environment:
+      POSTGRES_DB: realestate_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_pass
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data_6:/var/lib/postgresql/data
+    networks:
+      - runner-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d realestate_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis instances (one per runner)
+  redis-4:
+    image: redis:7-alpine
+    container_name: runner-redis-4
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_4:/data
+    networks:
+      runner-network:
+        aliases:
+          - redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  redis-5:
+    image: redis:7-alpine
+    container_name: runner-redis-5
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data_5:/data
+    networks:
+      - runner-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  redis-6:
+    image: redis:7-alpine
+    container_name: runner-redis-6
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis_data_6:/data
+    networks:
+      - runner-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # GitHub Actions Runners (3 parallel runners)
+  github-runner-4:
+    image: myoung34/github-runner:latest
+    container_name: github-runner-4
+    environment:
+      REPO_URL: https://github.com/Oleksandr-Gugnin-Software-Consulting/Customer-Demos
+      RUNNER_NAME: self-hosted-ci0-4
+      RUNNER_TOKEN: ${RUNNER_TOKEN_4}
+      RUNNER_WORKDIR: /tmp/runner/work
+      LABELS: self-hosted,Linux,X64
+      DATABASE_URL: postgresql://test_user:test_pass@postgres:5432/realestate_test
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: test
+      CI: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - runner_data_4:/tmp/runner
+    networks:
+      - runner-network
+    restart: unless-stopped
+    depends_on:
+      postgres-4:
+        condition: service_healthy
+      redis-4:
+        condition: service_healthy
+
+  github-runner-5:
+    image: myoung34/github-runner:latest
+    container_name: github-runner-5
+    environment:
+      REPO_URL: https://github.com/Oleksandr-Gugnin-Software-Consulting/Customer-Demos
+      RUNNER_NAME: self-hosted-ci0-5
+      RUNNER_TOKEN: ${RUNNER_TOKEN_5}
+      RUNNER_WORKDIR: /tmp/runner/work
+      LABELS: self-hosted,Linux,X64
+      DATABASE_URL: postgresql://test_user:test_pass@postgres:5432/realestate_test
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: test
+      CI: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - runner_data_5:/tmp/runner
+    networks:
+      - runner-network
+    restart: unless-stopped
+    depends_on:
+      postgres-5:
+        condition: service_healthy
+      redis-5:
+        condition: service_healthy
+
+  github-runner-6:
+    image: myoung34/github-runner:latest
+    container_name: github-runner-6
+    environment:
+      REPO_URL: https://github.com/Oleksandr-Gugnin-Software-Consulting/Customer-Demos
+      RUNNER_NAME: self-hosted-ci0-6
+      RUNNER_TOKEN: ${RUNNER_TOKEN_6}
+      RUNNER_WORKDIR: /tmp/runner/work
+      LABELS: self-hosted,Linux,X64
+      DATABASE_URL: postgresql://test_user:test_pass@postgres:5432/realestate_test
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: test
+      CI: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - runner_data_6:/tmp/runner
+    networks:
+      - runner-network
+    restart: unless-stopped
+    depends_on:
+      postgres-6:
+        condition: service_healthy
+      redis-6:
+        condition: service_healthy
+
+volumes:
+  postgres_data_4:
+  postgres_data_5:
+  postgres_data_6:
+  redis_data_4:
+  redis_data_5:
+  redis_data_6:
+  runner_data_4:
+  runner_data_5:
+  runner_data_6:
+
+``` 

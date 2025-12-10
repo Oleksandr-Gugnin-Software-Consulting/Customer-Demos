@@ -1,0 +1,10 @@
+pytest>=7.3.0
+pytest-xdist
+pytest-cov
+flake8
+black==25.11.0
+isort==7.0.0
+mypy
+bandit
+psycopg2-binary
+codecov

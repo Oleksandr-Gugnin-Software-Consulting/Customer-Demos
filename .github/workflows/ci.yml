@@ -1,0 +1,528 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+# Required permissions for private repository
+permissions:
+  contents: read
+  pull-requests: read
+  checks: write
+  statuses: write
+
+jobs:
+  changes:
+    name: Detect changed files
+    runs-on: [self-hosted, local]
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      core: ${{ steps.filter.outputs.core }}
+      tests: ${{ steps.filter.outputs.tests }}
+      docs: ${{ steps.filter.outputs.docs }}
+      docker: ${{ steps.filter.outputs.docker }}
+      ci: ${{ steps.filter.outputs.ci }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for git diff
+
+      - name: Check for file changes
+        id: filter
+        run: |
+          # Get base branch for comparison
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_REF="origin/main"
+          fi
+
+          echo "Comparing against: $BASE_REF"
+
+          # Fetch base ref to ensure we have it
+          git fetch origin main:refs/remotes/origin/main || true
+
+          # Get changed files
+          CHANGED_FILES=$(git diff --name-only $BASE_REF...HEAD 2>/dev/null || git diff --name-only HEAD~1...HEAD)
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # Check each category
+          CORE_CHANGED="false"
+          TESTS_CHANGED="false"
+          DOCS_CHANGED="false"
+          DOCKER_CHANGED="false"
+          CI_CHANGED="false"
+
+          while IFS= read -r file; do
+            case "$file" in
+              core/*|requirements.txt|pyproject.toml)
+                CORE_CHANGED="true"
+                ;;
+              tests/*|conftest.py)
+                TESTS_CHANGED="true"
+                ;;
+              docs/*|*.md|LICENSE)
+                DOCS_CHANGED="true"
+                ;;
+              Dockerfile|docker-compose*.yml|.dockerignore)
+                DOCKER_CHANGED="true"
+                ;;
+              .github/workflows/*)
+                CI_CHANGED="true"
+                ;;
+            esac
+          done <<< "$CHANGED_FILES"
+
+          # Set outputs
+          echo "core=$CORE_CHANGED" >> $GITHUB_OUTPUT
+          echo "tests=$TESTS_CHANGED" >> $GITHUB_OUTPUT
+          echo "docs=$DOCS_CHANGED" >> $GITHUB_OUTPUT
+          echo "docker=$DOCKER_CHANGED" >> $GITHUB_OUTPUT
+          echo "ci=$CI_CHANGED" >> $GITHUB_OUTPUT
+
+          # Summary
+          echo "### File Change Detection Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Core: $CORE_CHANGED" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: $TESTS_CHANGED" >> $GITHUB_STEP_SUMMARY
+          echo "- Docs: $DOCS_CHANGED" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker: $DOCKER_CHANGED" >> $GITHUB_STEP_SUMMARY
+          echo "- CI: $CI_CHANGED" >> $GITHUB_STEP_SUMMARY
+
+  test:
+    name: Unit tests on Python ${{ matrix.python-version }}
+    runs-on: [self-hosted, local]
+    needs: changes
+    if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
+    permissions:
+      contents: read
+      checks: write
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Cache pytest results
+      uses: actions/cache@v4
+      with:
+        path: .pytest_cache
+        key: pytest-unit-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('tests/unit/**') }}
+        restore-keys: |
+          pytest-unit-${{ runner.os }}-py${{ matrix.python-version }}-
+          pytest-unit-${{ runner.os }}-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+        pip install -e .
+
+    - name: Run unit tests with coverage
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+      run: |
+        pytest tests/unit/ -m "not benchmark" -n auto --dist loadgroup --ff --cov=core --cov-report=xml --cov-report=term-missing -v
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      if: matrix.python-version == '3.13'
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  integration-test:
+    name: Integration tests - ${{ matrix.group }}
+    runs-on: [self-hosted, local]
+    needs: changes
+    if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
+    permissions:
+      contents: read
+      checks: write
+    strategy:
+      fail-fast: false
+      matrix:
+        group: ['database', 'messaging', 'plugins', 'api']
+
+    # Note: PostgreSQL and Redis are already running on self-hosted runner
+    # via docker-compose (runner-postgres on port 5432, runner-redis on port 6379)
+    # No need for service containers - tests connect to localhost
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+
+    - name: Cache pytest results
+      uses: actions/cache@v4
+      with:
+        path: .pytest_cache
+        key: pytest-integration-${{ runner.os }}-${{ matrix.group }}-${{ hashFiles('tests/integration/**') }}
+        restore-keys: |
+          pytest-integration-${{ runner.os }}-${{ matrix.group }}-
+          pytest-integration-${{ runner.os }}-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+
+    - name: Wait for PostgreSQL
+      run: |
+        echo "Checking PostgreSQL connection..."
+        for i in {1..30}; do
+          if python -c "import psycopg2; psycopg2.connect(host='postgres', port=5432, dbname='realestate_test', user='test_user', password='test_pass')" 2>/dev/null; then
+            echo "PostgreSQL is ready!"
+            exit 0
+          fi
+          echo "Waiting for PostgreSQL... ($i/30)"
+          sleep 2
+        done
+        echo "PostgreSQL connection timeout"
+        exit 1
+
+    - name: Run ${{ matrix.group }} integration tests with coverage
+      env:
+        DB_HOST: postgres
+        DB_PORT: 5432
+        DB_NAME: realestate_test
+        DB_USER: test_user
+        DB_PASSWORD: test_pass
+        REDIS_HOST: redis
+        REDIS_PORT: 6379
+        REDIS_DB: 0
+      run: |
+        pytest tests/integration/ -m ${{ matrix.group }} --ff --cov=core --cov-report=xml --cov-report=term-missing -v
+
+    - name: Upload ${{ matrix.group }} test coverage
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        flags: integration-${{ matrix.group }}
+        name: codecov-integration-${{ matrix.group }}
+        fail_ci_if_error: false
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  lint:
+    name: Lint and format checks
+    runs-on: [self-hosted, local]
+    needs: changes
+    if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
+    permissions:
+      contents: read
+      checks: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install --force-reinstall --no-cache-dir black==25.11.0 isort==7.0.0
+        pip install -r requirements-dev.txt
+
+    - name: Run flake8
+      run: |
+        flake8 core/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 core/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=127 --extend-ignore=E203 --statistics
+
+    - name: Check formatting with black
+      run: |
+        black --check core/ tests/
+
+    - name: Run isort
+      run: |
+        isort --check-only core/ tests/
+
+  type-check:
+    name: Type checking with mypy
+    runs-on: [self-hosted, local]
+    needs: changes
+    if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
+    permissions:
+      contents: read
+      checks: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+
+    - name: Run mypy
+      run: |
+        mypy core/ --ignore-missing-imports --no-strict-optional
+
+  security:
+    name: Security checks
+    runs-on: [self-hosted, local]
+    needs: changes
+    if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
+    permissions:
+      contents: read
+      checks: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+
+    - name: Run bandit
+      run: |
+        bandit -r core/ -f json -o bandit-report.json || true
+        bandit -r core/ -ll -i
+
+    - name: Upload bandit report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: bandit-security-report
+        path: bandit-report.json
+
+  performance-test:
+    name: Performance benchmarks on Python 3.13
+    runs-on: [self-hosted, local]
+    needs: [changes, test, integration-test, lint, type-check, security]
+    if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
+    continue-on-error: true  # Don't block PR merge if benchmarks fail
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+        pip install -e .
+
+    - name: Run performance benchmarks
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+        OTEL_SDK_DISABLED: true
+        OTEL_TRACES_EXPORTER: none
+        OTEL_METRICS_EXPORTER: none
+        OTEL_LOGS_EXPORTER: none
+      run: |
+        pytest tests/unit/ -m "benchmark" -v --tb=short
+
+    - name: Comment benchmark results
+      if: always() && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const status = '${{ job.status }}';
+
+          const body = `### Performance Benchmarks - Python 3.13: ${status === 'success' ? '✅ PASS' : '⚠️ FAIL (non-blocking)'}
+
+          **Note:** Performance tests are informational and do not block PR merge.
+          Failures may occur due to CI runner load and do not indicate code issues.
+          Tests run only on Python 3.13 (latest version) to reduce CI time.
+
+          See [Issue #231](https://github.com/Oleksandr-Gugnin-Software-Consulting/Customer-Demos/issues/231) for details.`;
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: body
+          });
+
+  docker-build:
+    name: Docker image build
+    runs-on: [self-hosted, local]
+    needs: changes
+    if: needs.changes.outputs.core == 'true' || needs.changes.outputs.docker == 'true' || needs.changes.outputs.ci == 'true'
+    permissions:
+      contents: read
+      checks: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: false
+        load: true
+        tags: real-estate-api:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Test Docker image
+      run: |
+        # Cleanup any existing test container
+        docker rm -f test-api 2>/dev/null || true
+
+        # Detect if running inside Docker (macOS runners) or on host (server runners)
+        if [ -f /.dockerenv ]; then
+          echo "Running inside Docker container (macOS runner)"
+          # Get current container's network
+          RUNNER_NETWORK=$(docker inspect $(hostname) --format='{{range $net, $v := .NetworkSettings.Networks}}{{$net}}{{end}}' 2>/dev/null || echo "bridge")
+          echo "Using network: $RUNNER_NETWORK"
+
+          # Run container on same network as runner
+          CONTAINER_ID=$(docker run -d --name test-api \
+            --network "$RUNNER_NETWORK" \
+            -e DB_HOST=postgres \
+            -e DB_PORT=5432 \
+            -e DB_NAME=test \
+            -e DB_USER=test \
+            -e DB_PASSWORD=test \
+            real-estate-api:test)
+
+          echo "Container started: $CONTAINER_ID"
+
+          # Wait for container to start and show logs
+          sleep 5
+          echo "Container logs:"
+          docker logs test-api
+
+          # Check if container is still running
+          if ! docker ps | grep -q test-api; then
+            echo "ERROR: Container stopped unexpectedly"
+            echo "Full logs:"
+            docker logs test-api
+            exit 1
+          fi
+
+          # Wait a bit more for app to be ready
+          sleep 5
+
+          # Check health endpoint from inside the container (avoids DNS issues)
+          echo "Checking health endpoint..."
+          docker exec test-api curl -f http://localhost:8000/health || {
+            echo "Health check failed, container logs:"
+            docker logs test-api
+            exit 1
+          }
+        else
+          echo "Running on host (server runner)"
+          # Run with port mapping for host access
+          CONTAINER_ID=$(docker run -d --name test-api -p 8000:8000 \
+            -e DB_HOST=localhost \
+            -e DB_PORT=5432 \
+            -e DB_NAME=test \
+            -e DB_USER=test \
+            -e DB_PASSWORD=test \
+            real-estate-api:test)
+
+          echo "Container started: $CONTAINER_ID"
+
+          # Wait for container to start and show logs
+          sleep 5
+          echo "Container logs:"
+          docker logs test-api
+
+          # Check if container is still running
+          if ! docker ps | grep -q test-api; then
+            echo "ERROR: Container stopped unexpectedly"
+            echo "Full logs:"
+            docker logs test-api
+            exit 1
+          fi
+
+          # Wait a bit more for app to be ready
+          sleep 5
+
+          # Check health endpoint via localhost
+          echo "Checking health endpoint..."
+          curl -f http://localhost:8000/health || {
+            echo "Health check failed, container logs:"
+            docker logs test-api
+            exit 1
+          }
+        fi
+
+        echo "Container is healthy"
+
+        # Final logs
+        echo "Final container logs:"
+        docker logs test-api
+
+        # Cleanup
+        docker stop test-api
+        docker rm test-api
+
+    - name: Check image size
+      run: |
+        IMAGE_SIZE=$(docker image inspect real-estate-api:test --format='{{.Size}}')
+        IMAGE_SIZE_MB=$((IMAGE_SIZE / 1024 / 1024))
+        echo "Image size: ${IMAGE_SIZE_MB}MB"
+
+        if [ $IMAGE_SIZE_MB -gt 200 ]; then
+          echo "::warning::Image size (${IMAGE_SIZE_MB}MB) exceeds 200MB target"
+        else
+          echo "::notice::Image size (${IMAGE_SIZE_MB}MB) is within 200MB target"
+        fi

@@ -1,0 +1,6 @@
+version: '3.8'
+
+networks:
+  runner-network:
+    # DEPRECATED: This file has been replaced by `docker-compose.ci0.yml`.
+    # Use `.github/ci/runners/docker-compose.ci0.yml` instead.
