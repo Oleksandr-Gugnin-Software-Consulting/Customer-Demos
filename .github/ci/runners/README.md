@@ -119,10 +119,30 @@ on each server.
 
 ## Port allocation and isolation
 
-Each runner keeps PostgreSQL and Redis in separate containers and uses
-dedicated internal ports to avoid conflicts on the host. The compose files
-are written so services are not exposed publicly; they are reachable only on
-the host or internal Docker network.
+Each runner runs its own PostgreSQL and Redis container. Host port mappings
+are unique per runner to avoid host-port collisions (see the Port Allocation
+table below). Inside each container PostgreSQL and Redis use their standard
+internal ports (`5432` and `6379`).
+
+The compose files publish these services on the host using distinct ports
+(for example `5432`/`5433`/`5434` and `6379`/`6380`/`6381`) so services are
+accessible from the host at those ports. Services are also reachable to other
+containers on the same Docker network (`runner-network`) by service name.
+
+Important implementation note: in the current compose files an alias named
+`postgres` and `redis` is attached only to the *first* database/redis service
+in each compose (for example `postgres-1` in `docker-compose.ci1.yml` or
+`postgres-4` in `docker-compose.ci0.yml`). The runner containers' environment
+variables (`DATABASE_URL`, `REDIS_URL`) currently use the hostnames
+`postgres` and `redis`. That means, as implemented today, all runners in a
+given compose file will resolve `postgres` / `redis` to the aliased instance
+(the first one) unless you explicitly update a runner's environment to point
+to `postgres-2`, `redis-2`, etc.
+
+This README describes the repository's actual configuration (no code
+changes). If you want per-runner DNS isolation instead of shared aliases,
+adjust the runner `DATABASE_URL`/`REDIS_URL` to reference the explicit
+service names (for example `postgres-2` / `redis-2`).
 
 ## Maintenance
 
