@@ -33,9 +33,11 @@ server="ci1"
 tokens=""
 local_mode=0
 
+repo=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --target) target="$2"; shift 2 ;;
+    --repo) repo="$2"; shift 2 ;;
     --server) server="$2"; shift 2 ;;
     --tokens) tokens="$2"; shift 2 ;;
     --local) local_mode=1; shift ;;
@@ -75,6 +77,37 @@ EOF
   else
     echo "# Place RUNNER_TOKEN_1, RUNNER_TOKEN_2, RUNNER_TOKEN_3 in this file before starting the runners" >> "$out"
   fi
+}
+
+generate_tokens_via_gh() {
+  # Populate global 'tokens' variable with comma-separated tokens
+  # Determine repo to use
+  if [[ -n "$repo" ]]; then
+    use_repo="$repo"
+  else
+    # Try gh to detect repo, fallback to default
+    if command -v gh >/dev/null 2>&1; then
+      use_repo=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null || true)
+    fi
+    if [[ -z "$use_repo" ]]; then
+      use_repo="Oleksandr-Gugnin-Software-Consulting/Customer-Demos"
+    fi
+  fi
+
+  echo "Generating 3 registration tokens for repository $use_repo (via gh)..."
+  tlist=()
+  for i in 1 2 3; do
+    # Use gh api to create a registration token
+    token=$(gh api -X POST repos/$use_repo/actions/runners/registration-token --jq '.token' 2>/dev/null || true)
+    if [[ -z "$token" ]]; then
+      echo "Failed to generate token #$i via gh for repo $use_repo" >&2
+      return 1
+    fi
+    tlist+=("$token")
+    # small sleep to avoid hitting rate limits
+    sleep 0.2
+  done
+  tokens=$(IFS=,; echo "${tlist[*]}")
 }
 
 run_compose_cmd() {
