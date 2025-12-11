@@ -44,7 +44,7 @@ This repository showcases professional software engineering practices for buildi
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 Customer-Demos/
@@ -70,7 +70,7 @@ Customer-Demos/
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### **Prerequisites**
 - Python 3.11 or higher
@@ -124,7 +124,7 @@ docker run -p 8000:8000 customer-demos:latest
 
 ---
 
-## 🔧 CI/CD Pipeline
+## CI/CD Pipeline
 
 ### **Workflow Architecture**
 
@@ -154,7 +154,7 @@ The pipeline intelligently skips jobs when changes don't affect them:
 
 ---
 
-## 🛠️ Self-Hosted Runners
+## Self-Hosted Runners
 
 Deploy GitHub Actions runners with automated token management:
 
@@ -177,11 +177,11 @@ Deploy GitHub Actions runners with automated token management:
 - Configures isolated Docker networks
 - Sets up PostgreSQL and Redis per runner
 
-📖 See [`.github/ci/runners/README.md`](.github/ci/runners/README.md) for details.
+See [`.github/ci/runners/README.md`](.github/ci/runners/README.md) for details.
 
 ---
 
-## 📊 Code Quality Standards
+## Code Quality Standards
 
 - **Test Coverage**: Minimum 80% (tracked via pytest-cov)
 - **Type Coverage**: 100% with mypy strict mode
@@ -192,7 +192,7 @@ Deploy GitHub Actions runners with automated token management:
 
 ---
 
-## 🤝 Development Workflow
+## Development Workflow
 
 1. **Create a feature branch**
    ```bash
@@ -225,7 +225,7 @@ The CI pipeline will automatically:
 
 ---
 
-## 📝 Technologies Used
+## Technologies Used
 
 | Category | Technologies |
 |----------|-------------|
@@ -241,19 +241,19 @@ The CI pipeline will automatically:
 
 ---
 
-## 📈 Project Highlights
+## Project Highlights
 
-✅ **Production-ready CI/CD** with optimized parallel execution  
-✅ **Multi-environment testing** (Python 3.11, 3.12, 3.13)  
-✅ **Infrastructure automation** for self-hosted runners  
-✅ **Comprehensive test coverage** (unit + integration)  
-✅ **Security-first approach** with automated scanning  
-✅ **Docker best practices** (slim images, non-root user)  
-✅ **Maintainable architecture** with reusable workflows  
+**Production-ready CI/CD** with optimized parallel execution  
+**Multi-environment testing** (Python 3.11, 3.12, 3.13)  
+**Infrastructure automation** for self-hosted runners  
+**Comprehensive test coverage** (unit + integration)  
+**Security-first approach** with automated scanning  
+**Docker best practices** (slim images, non-root user)  
+**Maintainable architecture** with reusable workflows  
 
 ---
 
-## 📧 Contact
+## Contact
 
 **Oleksandr Gugnin**
 
@@ -262,6 +262,6 @@ The CI pipeline will automatically:
 
 ---
 
-## 📄 License
+## License
 
 This project is a demonstration repository for showcasing professional software engineering practices.
