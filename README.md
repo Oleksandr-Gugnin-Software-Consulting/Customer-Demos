@@ -7,8 +7,6 @@
 **Note:** This is a demonstration repository showcasing my CI/CD engineering standards.  
 It is not a production system, and application code is intentionally simplified.
 
-> **Python application demonstrating CI/CD pipelines, containerization, testing strategies, and infrastructure automation.**
-
 This repository demonstrates professional engineering practices for building, testing, and deploying modern Python applications. Perfect reference for teams seeking to implement robust DevOps workflows.
 
 ---
@@ -50,6 +48,7 @@ This repository demonstrates professional engineering practices for building, te
 ## Architecture
 
 **Note:** This architecture represents a simplified layout designed purely for demonstration.
+
 
 ```
 Customer-Demos/
