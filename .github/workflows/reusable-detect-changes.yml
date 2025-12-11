@@ -1,0 +1,91 @@
+on:
+  workflow_call:
+    outputs:
+      core: {}
+      tests: {}
+      docs: {}
+      docker: {}
+      ci: {}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  detect:
+    name: Detect changed files
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      core: ${{ steps.filter.outputs.core }}
+      tests: ${{ steps.filter.outputs.tests }}
+      docs: ${{ steps.filter.outputs.docs }}
+      docker: ${{ steps.filter.outputs.docker }}
+      ci: ${{ steps.filter.outputs.ci }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for file changes
+        id: filter
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_REF="${{ github.event.before }}"
+            if [ -z "$BASE_REF" ] || [ "$BASE_REF" = "0000000000000000000000000000000000000000" ]; then
+              BASE_REF="origin/main"
+            fi
+          fi
+
+          echo "Comparing against: $BASE_REF"
+
+          git fetch origin "$BASE_REF":refs/remotes/origin/base || git fetch --all --prune || true
+
+          CHANGED_FILES=$(git diff --name-only $BASE_REF...HEAD 2>/dev/null || git diff --name-only HEAD~1...HEAD)
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          CORE_CHANGED="false"
+          TESTS_CHANGED="false"
+          DOCS_CHANGED="false"
+          DOCKER_CHANGED="false"
+          CI_CHANGED="false"
+
+          while IFS= read -r file; do
+            case "$file" in
+              core/*|requirements.txt|pyproject.toml)
+                CORE_CHANGED="true"
+                ;;
+              tests/*|conftest.py)
+                TESTS_CHANGED="true"
+                ;;
+              docs/*|*.md|LICENSE)
+                DOCS_CHANGED="true"
+                ;;
+              Dockerfile|docker-compose*.yml|.dockerignore)
+                DOCKER_CHANGED="true"
+                ;;
+              .github/workflows/*)
+                CI_CHANGED="true"
+                ;;
+            esac
+          done <<< "$CHANGED_FILES"
+
+          echo "core=$CORE_CHANGED" >> $GITHUB_OUTPUT
+          echo "tests=$TESTS_CHANGED" >> $GITHUB_OUTPUT
+          echo "docs=$DOCS_CHANGED" >> $GITHUB_OUTPUT
+          echo "docker=$DOCKER_CHANGED" >> $GITHUB_OUTPUT
+          echo "ci=$CI_CHANGED" >> $GITHUB_OUTPUT
+
+          echo "### File Change Detection Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Core: $CORE_CHANGED" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: $TESTS_CHANGED" >> $GITHUB_STEP_SUMMARY
+          echo "- Docs: $DOCS_CHANGED" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker: $DOCKER_CHANGED" >> $GITHUB_STEP_SUMMARY
+          echo "- CI: $CI_CHANGED" >> $GITHUB_STEP_SUMMARY

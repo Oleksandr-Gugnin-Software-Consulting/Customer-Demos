@@ -16,403 +16,88 @@ permissions:
 jobs:
   changes:
     name: Detect changed files
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-    outputs:
-      core: ${{ steps.filter.outputs.core }}
-      tests: ${{ steps.filter.outputs.tests }}
-      docs: ${{ steps.filter.outputs.docs }}
-      docker: ${{ steps.filter.outputs.docker }}
-      ci: ${{ steps.filter.outputs.ci }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Fetch all history for git diff
-
-      - name: Check for file changes
-        id: filter
-        run: |
-          # Determine base ref for comparison
-          # - For pull requests use the base commit SHA
-          # - For pushes use the previous commit SHA from the webhook (`github.event.before`)
-          #   which points to the commit before the push. Fall back to `origin/main` if unavailable.
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE_REF="${{ github.event.pull_request.base.sha }}"
-          else
-            BASE_REF="${{ github.event.before }}"
-            if [ -z "$BASE_REF" ] || [ "$BASE_REF" = "0000000000000000000000000000000000000000" ]; then
-              BASE_REF="origin/main"
-            fi
-          fi
-
-          echo "Comparing against: $BASE_REF"
-
-          # Fetch the base ref so that `git diff` can compare against it.
-          # Try fetching the specific base SHA first, otherwise fetch all refs.
-          git fetch origin "$BASE_REF":refs/remotes/origin/base || git fetch --all --prune || true
-
-          # Get changed files
-          CHANGED_FILES=$(git diff --name-only $BASE_REF...HEAD 2>/dev/null || git diff --name-only HEAD~1...HEAD)
-
-          echo "Changed files:"
-          echo "$CHANGED_FILES"
-
-          # Check each category
-          CORE_CHANGED="false"
-          TESTS_CHANGED="false"
-          DOCS_CHANGED="false"
-          DOCKER_CHANGED="false"
-          CI_CHANGED="false"
-
-          while IFS= read -r file; do
-            case "$file" in
-              core/*|requirements.txt|pyproject.toml)
-                CORE_CHANGED="true"
-                ;;
-              tests/*|conftest.py)
-                TESTS_CHANGED="true"
-                ;;
-              docs/*|*.md|LICENSE)
-                DOCS_CHANGED="true"
-                ;;
-              Dockerfile|docker-compose*.yml|.dockerignore)
-                DOCKER_CHANGED="true"
-                ;;
-              .github/workflows/*)
-                CI_CHANGED="true"
-                ;;
-            esac
-          done <<< "$CHANGED_FILES"
-
-          # Set outputs
-          echo "core=$CORE_CHANGED" >> $GITHUB_OUTPUT
-          echo "tests=$TESTS_CHANGED" >> $GITHUB_OUTPUT
-          echo "docs=$DOCS_CHANGED" >> $GITHUB_OUTPUT
-          echo "docker=$DOCKER_CHANGED" >> $GITHUB_OUTPUT
-          echo "ci=$CI_CHANGED" >> $GITHUB_OUTPUT
-
-          # Summary
-          echo "### File Change Detection Results" >> $GITHUB_STEP_SUMMARY
-          echo "- Core: $CORE_CHANGED" >> $GITHUB_STEP_SUMMARY
-          echo "- Tests: $TESTS_CHANGED" >> $GITHUB_STEP_SUMMARY
-          echo "- Docs: $DOCS_CHANGED" >> $GITHUB_STEP_SUMMARY
-          echo "- Docker: $DOCKER_CHANGED" >> $GITHUB_STEP_SUMMARY
-          echo "- CI: $CI_CHANGED" >> $GITHUB_STEP_SUMMARY
+    uses: ./.github/workflows/reusable-detect-changes.yml
 
   test:
-    name: Unit tests on Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    name: Unit tests on Python matrix
     needs: changes
     if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
-    permissions:
-      contents: read
-      checks: write
     strategy:
       fail-fast: false
       matrix:
         python-version: ['3.11', '3.12', '3.13']
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-        cache: 'pip'
-
-    - name: Cache pytest results
-      uses: actions/cache@v4
-      with:
-        path: .pytest_cache
-        key: pytest-unit-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('tests/unit/**') }}
-        restore-keys: |
-          pytest-unit-${{ runner.os }}-py${{ matrix.python-version }}-
-          pytest-unit-${{ runner.os }}-
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r requirements-dev.txt
-        pip install -e .
-
-    - name: Run unit tests with coverage
-      env:
-        PYTHONPATH: ${{ github.workspace }}
-      run: |
-        pytest tests/unit/ -m "not benchmark" -n auto --dist loadgroup --ff --cov=core --cov-report=xml --cov-report=term-missing -v
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      if: matrix.python-version == '3.13'
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-  integration-test:
-    name: Integration tests - ${{ matrix.group }}
-    runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
     permissions:
       contents: read
       checks: write
+
+    uses: ./.github/workflows/reusable-test.yml
+    with:
+      python-version: ${{ matrix.python-version }}
+    secrets: inherit
+
+  integration-test:
+    name: Integration tests
+    needs: changes
+    if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
     strategy:
       fail-fast: false
       matrix:
         group: ['database', 'messaging', 'plugins', 'api']
+    permissions:
+      contents: read
+      checks: write
 
-    # Note: PostgreSQL and Redis are already running on self-hosted runner
-    # via docker-compose (runner-postgres on port 5432, runner-redis on port 6379)
-    # No need for service containers - tests connect to localhost
-
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_DB: realestate_test
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_pass
-        ports:
-          - 5432:5432
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python 3.13
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.13'
-        cache: 'pip'
-
-    - name: Cache pytest results
-      uses: actions/cache@v4
-      with:
-        path: .pytest_cache
-        key: pytest-integration-${{ runner.os }}-${{ matrix.group }}-${{ hashFiles('tests/integration/**') }}
-        restore-keys: |
-          pytest-integration-${{ runner.os }}-${{ matrix.group }}-
-          pytest-integration-${{ runner.os }}-
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r requirements-dev.txt
-
-    - name: Wait for PostgreSQL
-      run: |
-        echo "Checking PostgreSQL connection..."
-        for i in {1..30}; do
-          if python -c "import psycopg2; psycopg2.connect(host='postgres', port=5432, dbname='realestate_test', user='test_user', password='test_pass')" 2>/dev/null; then
-            echo "PostgreSQL is ready!"
-            exit 0
-          fi
-          echo "Waiting for PostgreSQL... ($i/30)"
-          sleep 2
-        done
-        echo "PostgreSQL connection timeout"
-        exit 1
-
-    - name: Run ${{ matrix.group }} integration tests with coverage
-      env:
-        DB_HOST: postgres
-        DB_PORT: 5432
-        DB_NAME: realestate_test
-        DB_USER: test_user
-        DB_PASSWORD: test_pass
-        REDIS_HOST: redis
-        REDIS_PORT: 6379
-        REDIS_DB: 0
-      run: |
-        pytest tests/integration/ -m ${{ matrix.group }} --ff --cov=core --cov-report=xml --cov-report=term-missing -v
-
-    - name: Upload ${{ matrix.group }} test coverage
-      uses: codecov/codecov-action@v4
-      with:
-        file: ./coverage.xml
-        flags: integration-${{ matrix.group }}
-        name: codecov-integration-${{ matrix.group }}
-        fail_ci_if_error: false
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    uses: ./.github/workflows/reusable-integration.yml
+    with:
+      group: ${{ matrix.group }}
+    secrets: inherit
 
   lint:
     name: Lint and format checks
-    runs-on: ubuntu-latest
     needs: changes
     if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
     permissions:
       contents: read
       checks: write
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python 3.13
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.13'
-        cache: 'pip'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install --force-reinstall --no-cache-dir black==25.11.0 isort==7.0.0
-        pip install -r requirements-dev.txt
-
-    - name: Run flake8
-      run: |
-        flake8 core/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 core/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=127 --extend-ignore=E203 --statistics
-
-    - name: Check formatting with black
-      run: |
-        black --check core/ tests/
-
-    - name: Run isort
-      run: |
-        isort --check-only core/ tests/
+    uses: ./.github/workflows/reusable-lint.yml
+    secrets: inherit
 
   type-check:
     name: Type checking with mypy
-    runs-on: ubuntu-latest
     needs: changes
     if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
     permissions:
       contents: read
       checks: write
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python 3.13
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.13'
-        cache: 'pip'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r requirements-dev.txt
-
-    - name: Run mypy
-      run: |
-        mypy core/ --ignore-missing-imports --no-strict-optional
+    uses: ./.github/workflows/reusable-typecheck.yml
+    secrets: inherit
 
   security:
     name: Security checks
-    runs-on: ubuntu-latest
     needs: changes
     if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
     permissions:
       contents: read
       checks: write
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python 3.13
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.13'
-        cache: 'pip'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements-dev.txt
-
-    - name: Run bandit
-      run: |
-        bandit -r core/ -f json -o bandit-report.json || true
-        bandit -r core/ -ll -i
-
-    - name: Upload bandit report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: bandit-security-report
-        path: bandit-report.json
+    uses: ./.github/workflows/reusable-security.yml
+    secrets: inherit
 
   performance-test:
-    name: Performance benchmarks on Python 3.13
-    runs-on: ubuntu-latest
+    name: Performance benchmarks
     needs: [changes, test, integration-test, lint, type-check, security]
     if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
-    continue-on-error: true  # Don't block PR merge if benchmarks fail
+    continue-on-error: true
     permissions:
       contents: read
       checks: write
       pull-requests: write
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Python 3.13
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.13'
-        cache: 'pip'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r requirements-dev.txt
-        pip install -e .
-
-    - name: Run performance benchmarks
-      env:
-        PYTHONPATH: ${{ github.workspace }}
-        OTEL_SDK_DISABLED: true
-        OTEL_TRACES_EXPORTER: none
-        OTEL_METRICS_EXPORTER: none
-        OTEL_LOGS_EXPORTER: none
-      run: |
-        pytest tests/unit/ -m "benchmark" -v --tb=short
-
-    - name: Comment benchmark results
-      if: always() && github.event_name == 'pull_request'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const status = '${{ job.status }}';
-
-          const body = `### Performance Benchmarks - Python 3.13: ${status === 'success' ? '✅ PASS' : '⚠️ FAIL (non-blocking)'}
-
-          **Note:** Performance tests are informational and do not block PR merge.
-          Failures may occur due to CI runner load and do not indicate code issues.
-          Tests run only on Python 3.13 (latest version) to reduce CI time.
-
-          See [Issue #231](https://github.com/Oleksandr-Gugnin-Software-Consulting/Customer-Demos/issues/231) for details.`;
-
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: body
-          });
+    strategy:
+      matrix:
+        python-version: ['3.13']
+    uses: ./.github/workflows/reusable-performance.yml
+    with:
+      python-version: ${{ matrix.python-version }}
+    secrets: inherit
 
   docker-build:
     name: Docker image build
