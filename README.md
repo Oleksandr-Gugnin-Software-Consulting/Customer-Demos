@@ -139,6 +139,7 @@ The CI pipeline uses **reusable workflows** for modularity and maintainability:
 | `reusable-typecheck.yml` | Static type checking | Called by `ci.yml` |
 | `reusable-security.yml` | Security vulnerability scanning | Called by `ci.yml` |
 | `reusable-performance.yml` | Benchmark tests | Called by `ci.yml` |
+| `reusable-docker-build.yml` | Docker image build, test, size check | Called by `ci.yml` |
 
 ### **Change Detection**
 
