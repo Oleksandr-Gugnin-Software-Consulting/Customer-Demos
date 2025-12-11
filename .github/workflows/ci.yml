@@ -552,6 +552,8 @@ jobs:
     name: Self-hosted runner demo
     # This job intentionally runs on any available self-hosted runner to demonstrate
     # that self-hosted runners accept jobs. It is unconditional (runs on every push).
+    # Temporarily disabled for demo (avoid claiming self-hosted availability)
+    if: false
     runs-on: [self-hosted]
     permissions:
       contents: read
