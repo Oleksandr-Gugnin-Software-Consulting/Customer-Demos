@@ -7,7 +7,7 @@ This directory contains Docker Compose configurations for deploying GitHub Actio
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
-│  GitHub Actions - 6 Parallel Self-Hosted Runners                          │
+│  GitHub Actions - Multiple Parallel Self-Hosted Runners                          │
 └───────────────────────────────────────────────────────────────────────────┘
                            │
                            ▼
@@ -82,28 +82,24 @@ support integration tests without port conflicts between runners.
 
 ## Quick Start
 
-1. Copy the appropriate compose file to the server and the `.env.example`:
+A small helper script is provided to automate deployment of self-hosted
+runners from this repository. The script copies the selected compose file,
+creates a `.env` (optionally populated with tokens) and starts the services
+either locally or on a remote host via SSH.
+
+Usage examples:
 
 ```bash
-scp docker-compose.ci1.yml ci1:~/github-runner/docker-compose.yml
-scp .env.example ci1:~/github-runner/.env
+# Deploy remotely to `ci1` (replace user@ci1 with your SSH target):
+.github/ci/runners/deploy_runner.sh --target user@ci1 --server ci1 --tokens T1,T2,T3
+
+# Deploy locally on the server (run the script on the server):
+.github/ci/runners/deploy_runner.sh --server ci0 --local --tokens T4,T5,T6
 ```
 
-2. On the server, fill in runner tokens in `.env` (see tokens section below),
-   then start:
-
-```bash
-ssh ci1
-cd ~/github-runner
-docker-compose up -d
-```
-
-3. Verify running services:
-
-```bash
-docker-compose ps
-docker-compose logs -f
-```
+If you prefer to manage files manually, the compose files for each server are
+still present in this directory (`docker-compose.ci1.yml` and
+`docker-compose.ci0.yml`).
 
 ## Generating registration tokens
 
