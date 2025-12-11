@@ -87,14 +87,22 @@ runners from this repository. The script copies the selected compose file,
 creates a `.env` (optionally populated with tokens) and starts the services
 either locally or on a remote host via SSH.
 
+
 Usage examples:
 
 ```bash
-# Deploy remotely to `ci1` (replace user@ci1 with your SSH target):
+# Deploy remotely to `ci1` (replace user@ci1 with your SSH target), let the
+# script generate tokens via the authenticated `gh` CLI:
+.github/ci/runners/deploy_runner.sh --target user@ci1 --server ci1
+
+# Deploy locally on the server and have the script generate tokens:
+.github/ci/runners/deploy_runner.sh --server ci0 --local
+
+# If you prefer to provide tokens yourself, use --tokens:
 .github/ci/runners/deploy_runner.sh --target user@ci1 --server ci1 --tokens T1,T2,T3
 
-# Deploy locally on the server (run the script on the server):
-.github/ci/runners/deploy_runner.sh --server ci0 --local --tokens T4,T5,T6
+# To target a different GitHub repository when generating tokens, pass --repo:
+.github/ci/runners/deploy_runner.sh --target user@ci1 --server ci1 --repo myorg/my-repo
 ```
 
 If you prefer to manage files manually, the compose files for each server are
@@ -103,15 +111,30 @@ still present in this directory (`docker-compose.ci1.yml` and
 
 ## Generating registration tokens
 
-On your development machine, create tokens for each runner that you will
-register. Each token expires after 1 hour.
+Automatic generation (recommended)
 
-```bash
-gh api -X POST repos/Oleksandr-Gugnin-Software-Consulting/Customer-Demos/actions/runners/registration-token --jq '.token'
+The `deploy_runner.sh` script can automatically create registration tokens
+using the `gh` CLI. If `--tokens` is not provided the script will attempt to
+generate three tokens by calling the GitHub API through `gh`:
+
+```text
+gh api -X POST repos/<owner>/<repo>/actions/runners/registration-token --jq '.token'
 ```
 
-Repeat for as many tokens as you need, then paste them into the `.env` file
-on each server.
+Requirements and notes:
+- `gh` must be installed and authenticated on the machine where you run the
+  deploy script (the script will call `gh api`).
+- The authenticated account (or token used by `gh`) must have permissions to
+  create registration tokens for the target repository.
+- Generated tokens expire after one hour; the script writes them into the
+  generated `.env` as `RUNNER_TOKEN_1/2/3` and then copies that `.env` to the
+  target host.
+
+Manual generation (optional)
+
+If you prefer to create tokens manually, you can run the command above and
+paste the resulting tokens into `.env` on the target host (or pass them via
+`--tokens T1,T2,T3` to the script).
 
 ## Port allocation and isolation
 
