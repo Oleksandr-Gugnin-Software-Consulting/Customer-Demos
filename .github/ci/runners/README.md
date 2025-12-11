@@ -1,4 +1,4 @@
-````markdown
+
 # Self-Hosted GitHub Actions Runners
 
 This directory contains Docker Compose configurations for deploying GitHub Actions self-hosted runners across multiple servers.
