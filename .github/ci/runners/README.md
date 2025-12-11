@@ -7,7 +7,7 @@ This directory contains Docker Compose configurations for deploying GitHub Actio
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
-│  GitHub Actions - Multiple Parallel Self-Hosted Runners                          │
+│  GitHub Actions - Multiple Parallel Self-Hosted Runners                   │
 └───────────────────────────────────────────────────────────────────────────┘
                            │
                            ▼
@@ -17,13 +17,13 @@ This directory contains Docker Compose configurations for deploying GitHub Actio
 ┌─────────────────────────────────┐  ┌─────────────────────────────────┐
 │  ci1 Server (Ubuntu)            │  │  ci0 Server (CentOS)            │
 │                                 │  │                                 │
-│  ┌──────────┐ ┌──────────┐     │  │  ┌──────────┐ ┌──────────┐     │
-│  │Runner-1  │ │Runner-2  │     │  │  │Runner-4  │ │Runner-5  │     │
-│  │PG: 5432  │ │PG: 5433  │ ... │  │  │PG: 5432  │ │PG: 5433  │ ... │
-│  │Redis:6379│ │Redis:6380│     │  │  │Redis:6379│ │Redis:6380│     │
-│  └──────────┘ └──────────┘     │  │  └──────────┘ └──────────┘     │
+│  ┌──────────┐ ┌──────────┐      │  │  ┌──────────┐ ┌──────────┐      │
+│  │Runner-1  │ │Runner-2  │      │  │  │Runner-4  │ │Runner-5  │      │
+│  │PG: 5432  │ │PG: 5433  │ ...  │  │  │PG: 5432  │ │PG: 5433  │ ...  │
+│  │Redis:6379│ │Redis:6380│      │  │  │Redis:6379│ │Redis:6380│      │
+│  └──────────┘ └──────────┘      │  │  └──────────┘ └──────────┘      │
 │                                 │  │                                 │
-│  + Runner-3 (PG:5434, R:6381)  │  │  + Runner-6 (PG:5434, R:6381)  │
+│  + Runner-3 (PG:5434, R:6381)   │  │  + Runner-6 (PG:5434, R:6381)   │
 └─────────────────────────────────┘  └─────────────────────────────────┘
 ```
 
