@@ -252,12 +252,12 @@ If you see "port is already allocated":
 
 ## Benefits
 
-- ✅ **6x Parallel Execution**: Run 6 jobs simultaneously
-- ✅ **High Availability**: 2 servers, if one fails 3 runners remain
-- ✅ **Isolated Services**: No port conflicts between runners
-- ✅ **Auto-Restart**: Survives server reboots
-- ✅ **Cost Savings**: Unlimited GitHub Actions minutes
-- ✅ **Fast CI**: No queue time, local caching
+- **6x Parallel Execution**: Run 6 jobs simultaneously
+- **High Availability**: 2 servers, if one fails 3 runners remain
+- **Isolated Services**: No port conflicts between runners
+- **Auto-Restart**: Survives server reboots
+- **Cost Savings**: Unlimited GitHub Actions minutes
+- **Fast CI**: No queue time, local caching
 
 ## Related Documentation
 
@@ -521,12 +521,12 @@ If you see "port is already allocated":
 
 ## Benefits
 
-- ✅ **6x Parallel Execution**: Run 6 jobs simultaneously
-- ✅ **High Availability**: 2 servers, if one fails 3 runners remain
-- ✅ **Isolated Services**: No port conflicts between runners
-- ✅ **Auto-Restart**: Survives server reboots
-- ✅ **Cost Savings**: Unlimited GitHub Actions minutes
-- ✅ **Fast CI**: No queue time, local caching
+- **6x Parallel Execution**: Run 6 jobs simultaneously
+- **High Availability**: 2 servers, if one fails 3 runners remain
+- **Isolated Services**: No port conflicts between runners
+- **Auto-Restart**: Survives server reboots
+- **Cost Savings**: Unlimited GitHub Actions minutes
+- **Fast CI**: No queue time, local caching
 
 ## Related Documentation
 
