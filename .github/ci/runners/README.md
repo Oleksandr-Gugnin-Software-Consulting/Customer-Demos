@@ -404,5 +404,4 @@ If you see "port is already allocated":
 
 ## Related Documentation
 
-- [Setup Guide](../../../docs/SELF_HOSTED_RUNNER.md)
 - [GitHub Actions Runner](https://github.com/myoung34/docker-github-actions-runner)
