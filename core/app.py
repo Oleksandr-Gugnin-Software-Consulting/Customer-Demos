@@ -14,6 +14,9 @@ async def health() -> dict:
 
 
 if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # The application is served by the Docker/CI `uvicorn` command defined
+    # in the Dockerfile / CI steps. Avoid running uvicorn here to prevent
+    # hardcoded network binding in module code (Bandit B104).
+    # Example to run locally:
+    #   uvicorn core.app:app --host 127.0.0.1 --port 8000
+    pass
