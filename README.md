@@ -258,6 +258,7 @@ The CI pipeline will automatically:
 
 **Oleksandr Gugnin**
 
+- LinkedIn: [oleksandr-gugnin](https://www.linkedin.com/in/oleksandr-gugnin/)
 - GitHub: [@Oleksandr-Gugnin-Software-Consulting](https://github.com/Oleksandr-Gugnin-Software-Consulting)
 - Repository: [Customer-Demos](https://github.com/Oleksandr-Gugnin-Software-Consulting/Customer-Demos)
 
