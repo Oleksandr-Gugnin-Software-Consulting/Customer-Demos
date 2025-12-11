@@ -1,9 +1,5 @@
 on:
   workflow_call:
-    inputs:
-      group:
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -11,8 +7,12 @@ permissions:
 
 jobs:
   run:
-    name: Integration tests - ${{ inputs.group }}
+    name: Integration tests
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        group: ['database', 'messaging', 'plugins', 'api']
     services:
       postgres:
         image: postgres:15-alpine
@@ -41,9 +41,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .pytest_cache
-          key: pytest-integration-${{ runner.os }}-${{ inputs.group }}-${{ hashFiles('tests/integration/**') }}
+          key: pytest-integration-${{ runner.os }}-${{ matrix.group }}-${{ hashFiles('tests/integration/**') }}
           restore-keys: |
-            pytest-integration-${{ runner.os }}-${{ inputs.group }}-
+            pytest-integration-${{ runner.os }}-${{ matrix.group }}-
             pytest-integration-${{ runner.os }}-
 
       - name: Install dependencies
@@ -66,7 +66,7 @@ jobs:
           echo "PostgreSQL connection timeout"
           exit 1
 
-      - name: Run ${{ inputs.group }} integration tests with coverage
+      - name: Run ${{ matrix.group }} integration tests with coverage
         env:
           DB_HOST: postgres
           DB_PORT: 5432
@@ -77,14 +77,14 @@ jobs:
           REDIS_PORT: 6379
           REDIS_DB: 0
         run: |
-          pytest tests/integration/ -m ${{ inputs.group }} --ff --cov=core --cov-report=xml --cov-report=term-missing -v
+          pytest tests/integration/ -m ${{ matrix.group }} --ff --cov=core --cov-report=xml --cov-report=term-missing -v
 
-      - name: Upload ${{ inputs.group }} test coverage
+      - name: Upload ${{ matrix.group }} test coverage
         uses: codecov/codecov-action@v4
         with:
           file: ./coverage.xml
-          flags: integration-${{ inputs.group }}
-          name: codecov-integration-${{ inputs.group }}
+          flags: integration-${{ matrix.group }}
+          name: codecov-integration-${{ matrix.group }}
           fail_ci_if_error: false
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

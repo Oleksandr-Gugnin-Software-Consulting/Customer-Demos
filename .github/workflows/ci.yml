@@ -16,87 +16,146 @@ permissions:
 jobs:
   changes:
     name: Detect changed files
-    uses: ./.github/workflows/reusable-detect-changes.yml
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      core: ${{ steps.filter.outputs.core }}
+      tests: ${{ steps.filter.outputs.tests }}
+      docs: ${{ steps.filter.outputs.docs }}
+      docker: ${{ steps.filter.outputs.docker }}
+      ci: ${{ steps.filter.outputs.ci }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for git diff
+
+      - name: Check for file changes
+        id: filter
+        run: |
+          # Determine base ref for comparison
+          # - For pull requests use the base commit SHA
+          # - For pushes use the previous commit SHA from the webhook (`github.event.before`)
+          #   which points to the commit before the push. Fall back to `origin/main` if unavailable.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_REF="${{ github.event.before }}"
+            if [ -z "$BASE_REF" ] || [ "$BASE_REF" = "0000000000000000000000000000000000000000" ]; then
+              BASE_REF="origin/main"
+            fi
+          fi
+
+          echo "Comparing against: $BASE_REF"
+
+          # Fetch the base ref so that `git diff` can compare against it.
+          # Try fetching the specific base SHA first, otherwise fetch all refs.
+          git fetch origin "$BASE_REF":refs/remotes/origin/base || git fetch --all --prune || true
+
+          # Get changed files
+          CHANGED_FILES=$(git diff --name-only $BASE_REF...HEAD 2>/dev/null || git diff --name-only HEAD~1...HEAD)
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # Check each category
+          CORE_CHANGED="false"
+          TESTS_CHANGED="false"
+          DOCS_CHANGED="false"
+          DOCKER_CHANGED="false"
+          CI_CHANGED="false"
+
+          while IFS= read -r file; do
+            case "$file" in
+              core/*|requirements.txt|pyproject.toml)
+                CORE_CHANGED="true"
+                ;;
+              tests/*|conftest.py)
+                TESTS_CHANGED="true"
+                ;;
+              docs/*|*.md|LICENSE)
+                DOCS_CHANGED="true"
+                ;;
+              Dockerfile|docker-compose*.yml|.dockerignore)
+                DOCKER_CHANGED="true"
+                ;;
+              .github/workflows/*)
+                CI_CHANGED="true"
+                ;;
+            esac
+          done <<< "$CHANGED_FILES"
+
+          # Set outputs
+          echo "core=$CORE_CHANGED" >> $GITHUB_OUTPUT
+          echo "tests=$TESTS_CHANGED" >> $GITHUB_OUTPUT
+          echo "docs=$DOCS_CHANGED" >> $GITHUB_OUTPUT
+          echo "docker=$DOCKER_CHANGED" >> $GITHUB_OUTPUT
+          echo "ci=$CI_CHANGED" >> $GITHUB_OUTPUT
+
+          # Summary
+          echo "### File Change Detection Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Core: $CORE_CHANGED" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: $TESTS_CHANGED" >> $GITHUB_STEP_SUMMARY
+          echo "- Docs: $DOCS_CHANGED" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker: $DOCKER_CHANGED" >> $GITHUB_STEP_SUMMARY
+          echo "- CI: $CI_CHANGED" >> $GITHUB_STEP_SUMMARY
 
   test:
+    uses: ./.github/workflows/reusable-test.yml
     name: Unit tests on Python matrix
     needs: changes
     if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.11', '3.12', '3.13']
-    permissions:
-      contents: read
-      checks: write
-
-    uses: ./.github/workflows/reusable-test.yml
-    with:
-      python-version: ${{ matrix.python-version }}
     secrets: inherit
 
   integration-test:
+    uses: ./.github/workflows/reusable-integration.yml
     name: Integration tests
     needs: changes
     if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        group: ['database', 'messaging', 'plugins', 'api']
-    permissions:
-      contents: read
-      checks: write
-
-    uses: ./.github/workflows/reusable-integration.yml
-    with:
-      group: ${{ matrix.group }}
     secrets: inherit
 
   lint:
+    uses: ./.github/workflows/reusable-lint.yml
     name: Lint and format checks
     needs: changes
     if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
     permissions:
       contents: read
       checks: write
-    uses: ./.github/workflows/reusable-lint.yml
     secrets: inherit
 
   type-check:
+    uses: ./.github/workflows/reusable-typecheck.yml
     name: Type checking with mypy
     needs: changes
     if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
     permissions:
       contents: read
       checks: write
-    uses: ./.github/workflows/reusable-typecheck.yml
     secrets: inherit
 
   security:
+    uses: ./.github/workflows/reusable-security.yml
     name: Security checks
     needs: changes
     if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
     permissions:
       contents: read
       checks: write
-    uses: ./.github/workflows/reusable-security.yml
     secrets: inherit
 
   performance-test:
+    uses: ./.github/workflows/reusable-performance.yml
     name: Performance benchmarks
     needs: [changes, test, integration-test, lint, type-check, security]
     if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.ci == 'true'
-    continue-on-error: true
     permissions:
       contents: read
       checks: write
       pull-requests: write
-    strategy:
-      matrix:
-        python-version: ['3.13']
-    uses: ./.github/workflows/reusable-performance.yml
-    with:
-      python-version: ${{ matrix.python-version }}
+    
     secrets: inherit
 
   docker-build:
