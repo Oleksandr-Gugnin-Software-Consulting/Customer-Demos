@@ -1,16 +1,16 @@
-# Customer Demos – Production-Grade Python CI/CD Showcase
+# Github Actins CI/CD Showcase for Python-based projects
 
 [![CI Pipeline](https://github.com/Oleksandr-Gugnin-Software-Consulting/Customer-Demos/actions/workflows/ci.yml/badge.svg)](https://github.com/Oleksandr-Gugnin-Software-Consulting/Customer-Demos/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-> **Enterprise-grade Python application demonstrating production CI/CD pipelines, containerization, testing strategies, and infrastructure automation.**
+> **Python application demonstrating production CI/CD pipelines, containerization, testing strategies, and infrastructure automation.**
 
 This repository showcases professional software engineering practices for building, testing, and deploying modern Python applications. Perfect reference for teams seeking to implement robust DevOps workflows.
 
 ---
 
-## 🎯 Key Features
+## Key Features
 
 ### **Production CI/CD Pipeline**
 - **Modular GitHub Actions workflows** with reusable components
@@ -255,8 +255,7 @@ The CI pipeline will automatically:
 
 ## 📧 Contact
 
-**Oleksandr Gugnin**  
-Software Consulting & Engineering
+**Oleksandr Gugnin**
 
 - GitHub: [@Oleksandr-Gugnin-Software-Consulting](https://github.com/Oleksandr-Gugnin-Software-Consulting)
 - Repository: [Customer-Demos](https://github.com/Oleksandr-Gugnin-Software-Consulting/Customer-Demos)
@@ -266,9 +265,3 @@ Software Consulting & Engineering
 ## 📄 License
 
 This project is a demonstration repository for showcasing professional software engineering practices.
-
----
-
-<div align="center">
-  <strong>Built with ❤️ using modern DevOps practices</strong>
-</div>
