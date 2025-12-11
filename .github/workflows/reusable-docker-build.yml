@@ -15,9 +15,6 @@ on:
         required: false
         type: string
         default: 'real-estate-api:test'
-    secrets:
-      GITHUB_TOKEN:
-        required: false
 
 jobs:
   docker-build:
